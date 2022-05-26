@@ -1,0 +1,7 @@
+Package: f4f-tools
+Version: VERSION
+Maintainer: Daniel Smrcka <smrcka@fly4future.com>
+Architecture: amd64
+Description: F4F debug tools
+Depends: python3, ros-galactic-ros-core, ros-galactic-ros2bag,
+ ros-galactic-rosbag2, batctl, tar
