@@ -1,33 +1,36 @@
 #!/usr/bin/env python3
-
 from mimetypes import init
-import string
-import sys
 import os
+import sys
+import string
 import argparse
-from random import uniform
 import time
 import iperf3
 import signal
+import threading
+import multiprocessing as mp
+import shutil
+import random
+import math
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import csv
 
-from std_srvs.srv import SetBool, Trigger
-from fog_msgs.srv import Vec4
 import rclpy
 from rclpy.node import Node
-from rclpy.parameter import Parameter
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy, QoSHistoryPolicy
-from rcl_interfaces.msg import ParameterValue, ParameterType
 from rcl_interfaces.srv import SetParameters, GetParameters
+from  scipy.interpolate import griddata 
 
 from px4_msgs.msg import VehicleGpsPosition
-from std_msgs.msg import String
 
-class FogClientAsync(Node):
+class Iperf:
 
-    def __init__(self, args):
-        super().__init__('fog_client_async')
-        self.drone_device_id = os.getenv('DRONE_DEVICE_ID')
+    def __init__(self, args, array=None, lock=None):
         self.args = args
+        self.lock = lock
+        self.array = array
 
     def run_server(self):
         server = iperf3.Server()
@@ -39,6 +42,7 @@ class FogClientAsync(Node):
             result = server.run()
             print("\tTest number %d done" % n)
             n = n + 1
+
 
     def run_client(self):
         client = iperf3.Client()
@@ -53,68 +57,140 @@ class FogClientAsync(Node):
     def test(self):
         while True:
             result = self.run_client()
-
             if result.error:
                 print(result.error)
                 time.sleep(1)
             else:
-                print('Test completed')
-                print(result.sent_MB_s, result.received_MB_s)
+                self.lock.acquire()
+                self.array[0] = result.sent_MB_s
+                self.array[1] = result.received_MB_s
+                self.lock.release()
 
-class FogClientSync(Node):
-    def __init__(self, args):
-        super().__init__('minimal_subscriber', namespace=os.getenv('DRONE_DEVICE_ID'))
-        self.drone_device_id = os.getenv('DRONE_DEVICE_ID')
+class PositionSubscriber(Node):
+    def __init__(self, args, name, array, lock, index):
+        super().__init__('position_subscriber', namespace=name)
+        self.drone_device_id = name
         self.args = args
-        self.vehicle_status_subs = None
-        self.navigation_status_subs = None
-        # self.msg_type = importlib.import_module(args.msg_type)
-        self._waiting = True
-        # self.topic = args.topic
+        self.lock = lock
+        self.array = array
+        self.index = index
         self.qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             durability=QoSDurabilityPolicy.VOLATILE,
             history=QoSHistoryPolicy.KEEP_LAST,
             depth=10
         )
-
-    def gps_position_listener_cb(self, msg):
-        self.get_logger().info('msg data={}'.format(msg.data))
-        if msg.data == 'IDLE':
-            self._waiting = False
-
-
-    def create_subs(self):
-        self.vehicle_gps_subs = self.create_subscription(
+        self.sub = self.create_subscription(
             VehicleGpsPosition,
-            '/{}/fmu/vehicle_gps_position/out'.format(self.drone_device_id),
+            '/{}/fmu/vehicle_gps_position/out'.format(name),
             self.gps_position_listener_cb,
             self.qos_profile)
-        self.vehicle_gps_subs  # prevent unused variable warning
-            
-    def waiting(self):
-        return self._waiting
+        self.sub
+
+    def gps_position_listener_cb(self, msg):
+        self.lock.acquire()
+        self.array[self.index] = msg.lat
+        self.array[self.index+1] = msg.lon
+        self.array[self.index+2] = msg.alt
+        self.lock.release()
+
+        
+class RosClient:
+    def __init__(self, args, names, array, lock):
+        self.nodes = []
+        self.lock = lock
+        self.names = names
+        self.array = array
+
+    def run(self):
+        for i, name in enumerate(self.names):
+            self.nodes.append(PositionSubscriber(args, name, self.array, self.lock, 2+i*3))
+
+        while True:
+            print(len(self.nodes))
+            for node in self.nodes:
+                rclpy.spin_once(node, timeout_sec=1) 
+                time.sleep(0.8)
+
+    def destroy(self):
+        for node in self.nodes:
+            node.destroy()
+
+class Plot(Node):
+    def __init__(self, args, data):
+        self.drone_device_id = os.getenv('DRONE_DEVICE_ID')
+        self.args = args
+        self.data = data
+
+    def plot(self):
+        x = self.data[:,2] - self.data[:,5]
+        y = self.data[:,3] - self.data[:,6]
+        i = self.data[:,0]
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        # define grid.
+        xi = np.linspace(np.min(x),np.max(x),100)
+        yi = np.linspace(np.min(y),np.max(y),100)
+        xi, yi = np.meshgrid(xi, yi)
+        
+        # grid the data.
+        zi = griddata((x, y), i, (xi, yi), method='linear')
+        
+        plt.contourf(xi,yi,zi)
+        plt.plot(x,y,'k.')
+        # ax.scatter(x, y, c=i, edgecolors='none', norm=matplotlib.colors.LogNorm())
+
+        cbar = plt.colorbar()
+
+        # bx = fig.add_subplot(122)
+        # bx.pcolormesh(zi, norm=matplotlib.colors.LogNorm())
+        # bx.pcolormesh(zi)
+
+        plt.show()
 
 
-    
+
+def generate_fake_output(w):
+    array = mp.Array('f', range(8))
+    x = 5
+    y = 15
+    r = 10
+    for i in range(500):
+        array[0] = 50*random.gauss(1, 0.1)
+        array[1] = 50*random.gauss(1, 0.1)
+        array[2] = x+r*math.cos(i) + random.gauss(0,0.1)
+        array[3] = x+r*math.sin(i) + random.gauss(0,0.1)
+        array[4] = 3+random.gauss(0,0.1)
+        array[5] = x+random.gauss(0,0.1)
+        array[6] = y+random.gauss(0,0.1)
+        array[7] = 3+random.gauss(0,0.1)
+
+        w.writerow(array)
+   
 def init_arg_parser():
     parser = argparse.ArgumentParser(
         prog='mesh_bandwith_test.py',
         epilog="See '<command> --help' to read about a specific sub-command."
     )
 
-    parser.add_argument('--timeout', type=int, default=30)
     subparsers = parser.add_subparsers(dest='command', help='Sub-commands')
 
     server_parser = subparsers.add_parser('server', help='Run server')
     server_parser.add_argument('--ip', type=str, help='Ip address of the server, default=[127.0.0.1]', default='127.0.0.1')
-    server_parser.add_argument('--port', type=int, default=5201)
+    server_parser.add_argument('-p', '--port', help='port, default=[5201]', default=5201)
 
     client_parser = subparsers.add_parser('client', help='Run client')
-    client_parser.add_argument('-ip', type=str, help='Ip address of the server to connect, default=[127.0.0.1]', default='127.0.0.1')
-    client_parser.add_argument('--port', type=int, help='port, default=[5201]', default=5201)
-    client_parser.add_argument('--time', type=int)
-    client_parser.add_argument('--uav_name', type=int)
+    client_parser.add_argument('-ip', '--ip', type=str, help='Ip address of the server to connect, default=[127.0.0.1]', default='127.0.0.1')
+    client_parser.add_argument('-p', '--port', type=int, help='port, default=[5201]', default=5201)
+    client_parser.add_argument('-n', '--server_name', type=str, help='Name of the uav where is server running')
+
+    plot_parser = subparsers.add_parser('plot', help='Plot the results')
+    plot_parser.add_argument('--file', type=str, help='Path to a file, default=[/tmp/data.csv]', default='/tmp/data.csv')
+
+    save_parser = subparsers.add_parser('save', help='Save results into given path')
+    save_parser.add_argument('--path', type=str, help='path to a file', required=True)
+
+    fake_parser = subparsers.add_parser('fake', help='Generate fake data for the plot testing')
 
     args = parser.parse_args()
     if args.command is None:
@@ -122,62 +198,73 @@ def init_arg_parser():
 
     return args
 
-def random_points_range(startx, endx, starty, endy):
-
-    x = round(uniform(startx, endx), 2)
-    y = round(uniform(starty, endy), 2)
-    z = round(uniform(1, 2), 2)
-
-    return x, y, z
-
-
-def get_waypoint(area):
-    if area == 0:
-        return 0.0, 0.0, 1.0
-    elif area == 1:
-        return random_points_range(-0.5, 0, 0, 1.5)
-    elif area == 2:
-        return random_points_range(-0.5, 0, -2, -3.5)
-    elif area == 3:
-        return random_points_range(-2, -2.5, -2, -3.5)
-    elif area == 4:
-        return random_points_range(-2, -2.5, 0, 1.5)
-    print("Area command failed. Choose an integer between 0 and 4.")
-    raise ValueError
-
-def handler(signum, frame):
-    print('SIGINT or CTRL-C detected. Exiting gracefully')
-    exit(0)
-
 def main(args):
 
-    status = 0
+    status = 1
 
-    rclpy.init()
+    if args.command == 'client':
+        lock = mp.Lock()
+        names = [os.getenv('DRONE_DEVICE_ID'), args.server_name]
+        array = mp.Array('f', range(2+3*len(names)))
 
-    fog_client = FogClientAsync(args)
-    fog_client_sync = FogClientSync(args)
+        rclpy.init()
+        file = open('/tmp/data.csv', 'w')
+        writer = csv.writer(file)
 
-    if args.command == 'server':
-        fog_client.run_server()
+        iperf = Iperf(args, array, lock)
+        ros = RosClient(args, names, array, lock)
 
-    elif args.command == 'client':
-        fog_client.test()
-        
-    fog_client_sync.create_subs()
+        ipp = mp.Process(target=iperf.test)
+        rosp = mp.Process(target=ros.run)
 
-    if fog_client_sync.waiting():
-        status = False
+        ipp.start()
+        rosp.start()
 
-    fog_client.destroy_node()
-    fog_client_sync.destroy_node()
+        try: 
+            while True:
+                lock.acquire()
+                # print("writing")
+                writer.writerow(array)
+                lock.release()
+                time.sleep(1)
+   
+        except KeyboardInterrupt:
+            ros.destroy()
+            ipp.terminate()
+            rosp.terminate()
+            ipp.join()
+            rosp.join()
+            file.close()
+            print('I am out')
+            rclpy.shutdown()
+            status = 0
 
-    rclpy.shutdown()
+    elif args.command == 'server':
+        iperf = Iperf(args)
+        iperf.run_server()
+        status = 0
+
+    elif args.command == 'plot':
+        data = np.genfromtxt(args.file, delimiter=',')
+        sp = Plot(args, data)
+        sp.plot()
+        status = 0
+
+    elif args.command == 'save':
+        shutil.copy('/tmp/data.csv', args.path) 
+        status = 0
+
+    elif args.command == 'fake':
+        file = open('/tmp/data.csv', 'w')
+        writer = csv.writer(file)
+        generate_fake_output(writer)
+        file.close()
+        status = 0
 
     return status
 
 if __name__ == '__main__':
-    signal.signal(signal.SIGINT, handler)
+
     args = init_arg_parser()
     status = main(args)
 
