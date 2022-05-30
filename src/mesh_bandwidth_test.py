@@ -27,11 +27,12 @@ from px4_msgs.msg import VehicleGpsPosition
 
 class Iperf:
 
-    def __init__(self, args, array=None, lock=None):
+    def __init__(self, args, array=None, lock=None, duration=1):
         self.args = args
         self.lock = lock
         self.array = array
         self.test_num = 1
+        self.duration = duration
 
     def run_server(self):
         server = iperf3.Server()
@@ -47,7 +48,7 @@ class Iperf:
 
     def run_client(self):
         client = iperf3.Client()
-        client.duration = 1
+        client.duration = self.duration 
         client.server_hostname = self.args.ip
         client.port = self.args.port
 
@@ -189,6 +190,7 @@ def init_arg_parser():
     client_parser.add_argument('-i', '--ip', type=str, help='Ip address of the server to connect, default=[127.0.0.1]', default='127.0.0.1')
     client_parser.add_argument('-p', '--port', type=int, help='port, default=[5201]', default=5201)
     client_parser.add_argument('-sn', '--server_name', type=str, help='Name of the device where the server is running', required=True)
+    client_parser.add_argument('-td', '--test_duration', type=int, help='Duration of each test cycle in seconds, default=[1]', default=1)
 
     plot_parser = subparsers.add_parser('plot', help='Plot the results')
     plot_parser.add_argument('-f', '--file', type=str, help='Path to a data file, default=[/tmp/data.csv]', default='/tmp/data.csv')
@@ -217,7 +219,7 @@ def main(args):
         file = open('/tmp/data.csv', 'w')
         writer = csv.writer(file)
 
-        iperf = Iperf(args, array, lock)
+        iperf = Iperf(args, array, lock, args.test_duration)
         ros = RosClient(args, names, array, lock)
 
         ipp = mp.Process(target=iperf.test)
