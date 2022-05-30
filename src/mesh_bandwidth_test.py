@@ -31,17 +31,18 @@ class Iperf:
         self.args = args
         self.lock = lock
         self.array = array
+        self.test_num = 1
 
     def run_server(self):
         server = iperf3.Server()
         server.bind_address = self.args.ip
         server.port = self.args.port
         print("Starting server, listening on %s:%d" % (self.args.ip, self.args.port))
-        n = 1
         while True:
             result = server.run()
-            print("\tTest number %d done" % n)
-            n = n + 1
+            print("\r\tTest number %d done" % self.test_num, end=" ")
+            sys.stdout.flush()
+            self.test_num += 1
 
 
     def run_client(self):
@@ -49,18 +50,22 @@ class Iperf:
         client.duration = 1
         client.server_hostname = self.args.ip
         client.port = self.args.port
-        client.num_streams = 1
 
         result = client.run()
         return result
         
     def test(self):
+        print("Starting client, listening on %s:%d" % (self.args.ip, self.args.port))
         while True:
             result = self.run_client()
             if result.error:
                 print(result.error)
                 time.sleep(1)
             else:
+                print('\r\tTest number {} done'.format(self.test_num), end=" ")
+                sys.stdout.flush()
+                self.test_num += 1
+
                 self.lock.acquire()
                 self.array[0] = result.sent_MB_s
                 self.array[1] = result.received_MB_s
@@ -107,7 +112,6 @@ class RosClient:
             self.nodes.append(PositionSubscriber(args, name, self.array, self.lock, 2+i*3))
 
         while True:
-            print(len(self.nodes))
             for node in self.nodes:
                 rclpy.spin_once(node, timeout_sec=1) 
                 time.sleep(0.8)
