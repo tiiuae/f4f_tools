@@ -131,10 +131,12 @@ class Plot(Node):
         # define grid.
         xi = np.linspace(np.min(x),np.max(x),100)
         yi = np.linspace(np.min(y),np.max(y),100)
+        # yi = np.linspace(0,2*np.pi,100)
         xi, yi = np.meshgrid(xi, yi)
         
         # grid the data.
         zi = griddata((x, y), i, (xi, yi), method='linear')
+        print(zi.shape)
         
         plt.contourf(xi,yi,zi)
         plt.plot(x,y,'k.')
@@ -158,12 +160,12 @@ def generate_fake_output(w):
     for i in range(500):
         array[0] = 50*random.gauss(1, 0.1)
         array[1] = 50*random.gauss(1, 0.1)
-        array[2] = x+r*math.cos(i) + random.gauss(0,0.1)
-        array[3] = x+r*math.sin(i) + random.gauss(0,0.1)
-        array[4] = 3+random.gauss(0,0.1)
-        array[5] = x+random.gauss(0,0.1)
-        array[6] = y+random.gauss(0,0.1)
-        array[7] = 3+random.gauss(0,0.1)
+        array[2] = x+r*math.cos(i) + random.gauss(0,1.1)
+        array[3] = x+r*math.sin(i) + random.gauss(0,1.1)
+        array[4] = 3+random.gauss(0,1.1)
+        array[5] = x+random.gauss(0,1.1)
+        array[6] = y+random.gauss(0,1.1)
+        array[7] = 3+random.gauss(0,1.1)
 
         w.writerow(array)
    
@@ -176,19 +178,19 @@ def init_arg_parser():
     subparsers = parser.add_subparsers(dest='command', help='Sub-commands')
 
     server_parser = subparsers.add_parser('server', help='Run server')
-    server_parser.add_argument('--ip', type=str, help='Ip address of the server, default=[127.0.0.1]', default='127.0.0.1')
+    server_parser.add_argument('-i', '--ip', type=str, help='Ip address of the server, default=[127.0.0.1]', default='127.0.0.1')
     server_parser.add_argument('-p', '--port', help='port, default=[5201]', default=5201)
 
     client_parser = subparsers.add_parser('client', help='Run client')
-    client_parser.add_argument('-ip', '--ip', type=str, help='Ip address of the server to connect, default=[127.0.0.1]', default='127.0.0.1')
+    client_parser.add_argument('-i', '--ip', type=str, help='Ip address of the server to connect, default=[127.0.0.1]', default='127.0.0.1')
     client_parser.add_argument('-p', '--port', type=int, help='port, default=[5201]', default=5201)
-    client_parser.add_argument('-n', '--server_name', type=str, help='Name of the uav where is server running')
+    client_parser.add_argument('-sn', '--server_name', type=str, help='Name of the device where the server is running', required=True)
 
     plot_parser = subparsers.add_parser('plot', help='Plot the results')
-    plot_parser.add_argument('--file', type=str, help='Path to a file, default=[/tmp/data.csv]', default='/tmp/data.csv')
+    plot_parser.add_argument('-f', '--file', type=str, help='Path to a data file, default=[/tmp/data.csv]', default='/tmp/data.csv')
 
     save_parser = subparsers.add_parser('save', help='Save results into given path')
-    save_parser.add_argument('--path', type=str, help='path to a file', required=True)
+    save_parser.add_argument('-p', '--path', type=str, help='Path to copy the data file', required=True)
 
     fake_parser = subparsers.add_parser('fake', help='Generate fake data for the plot testing')
 
