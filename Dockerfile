@@ -13,11 +13,11 @@ RUN /packaging/build-and-package-as-deb.sh -o build_output/
 # FROM ghcr.io/tiiuae/fog-ros-baseimage:stable
 FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-1cabd43
 
-COPY --from=builder /main_ws/src/build_output/ros-*-fake_lidar_*_amd64.deb /fake_lidar.deb
+COPY --from=builder /main_ws/src/build_output/ros-*-f4f-tools_*_amd64.deb /f4f-tools.deb
 
 # need update because ROS people have a habit of removing old packages pretty fast
 RUN apt update && apt install -y ros-${ROS_DISTRO}-tf2-ros \
-	&& dpkg -i /fake_lidar.deb && rm /fake_lidar.deb
+	&& dpkg -i /f4f-tools.deb && rm /f4f-tools.deb
 
 
 # pyserial + pymavlink are dependencies of mavlink_shell.

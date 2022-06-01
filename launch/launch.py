@@ -7,7 +7,7 @@ def generate_launch_description():
 
     ld = launch.LaunchDescription()
 
-    pkg_name = "fake_lidar_publisher"
+    pkg_name = "f4f_tools"
     pkg_share_path = get_package_share_directory(pkg_name)
  
     ld.add_action(launch.actions.DeclareLaunchArgument("use_sim_time", default_value="false"))

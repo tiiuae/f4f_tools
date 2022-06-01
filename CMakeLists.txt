@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(fake_lidar_publisher)
+project(f4f_tools)
 
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
