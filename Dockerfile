@@ -5,13 +5,13 @@ COPY . /main_ws/src/
 # this:
 # 1) builds the application
 # 2) packages the application as .deb & writes it to build_output/
-RUN /packaging/build-and-package-as-deb.sh -o build_output/
+RUN /packaging/build.sh
 
 #  ▲               runtime ──┐
 #  └── build                 ▼
 
-# FROM ghcr.io/tiiuae/fog-ros-baseimage:stable
-FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-1cabd43
+FROM ghcr.io/tiiuae/fog-ros-baseimage:stable
+# FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-1cabd43
 
 COPY --from=builder /main_ws/src/build_output/ros-*-f4f-tools_*_amd64.deb /f4f-tools.deb
 
