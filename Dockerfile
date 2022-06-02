@@ -19,13 +19,12 @@ COPY --from=builder /main_ws/src/build_output/ros-*-f4f-tools_*_amd64.deb /f4f-t
 RUN apt update && apt install -y ros-${ROS_DISTRO}-tf2-ros \
 	&& dpkg -i /f4f-tools.deb && rm /f4f-tools.deb
 
-
 # pyserial + pymavlink are dependencies of mavlink_shell.
 # unfortunately gcc is required to install pymavlink.
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     python3-pip python3-systemd gcc iperf3\
     && rm -rf /var/lib/apt/lists/* \
-    && pip3 install pyserial pymavlink mavsdk iperf3
+    && pip3 install pyserial pymavlink mavsdk iperf3 matplotlib scipy
 
 WORKDIR /f4f-tools
 
@@ -42,6 +41,4 @@ ENV LD_LIBRARY_PATH=/opt/ros/galactic/opt/yaml_cpp_vendor/lib:/opt/ros/galactic/
 
 COPY scripts/ /f4f-tools/
 
-WORKDIR /tools-data
-
-CMD ["ls", "-1", "/f4f-tools"]
+CMD ["ls", "/"]
