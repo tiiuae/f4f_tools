@@ -41,4 +41,4 @@ ENV LD_LIBRARY_PATH=/opt/ros/galactic/opt/yaml_cpp_vendor/lib:/opt/ros/galactic/
 
 COPY scripts/ /f4f-tools/
 
-CMD ["bash"]
+ENTRYPOINT ["bash"]
