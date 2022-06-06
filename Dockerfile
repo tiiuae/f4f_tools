@@ -40,3 +40,5 @@ ENV PYTHONPATH=/opt/ros/galactic/lib/python3.8/site-packages
 ENV LD_LIBRARY_PATH=/opt/ros/galactic/opt/yaml_cpp_vendor/lib:/opt/ros/galactic/lib/x86_64-linux-gnu:/opt/ros/galactic/lib
 
 COPY scripts/ /f4f-tools/
+
+CMD ["bash"]

@@ -13,9 +13,9 @@ from rclpy.node import Node
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 
-from fog_msgs.action import NavigationAction
-
-from fog_msgs.srv import Vec4 
+from fognav_msgs.action import NavigateToPose
+from fognav_msgs.action import Takeoff
+from fognav_msgs.action import Land
 
 from std_srvs.srv import Trigger
 from nav_msgs.msg import Path as NavPath
@@ -45,7 +45,7 @@ def quaternion_from_euler(roll, pitch, yaw):
 
     return q
 
-class NavigationActionClient(Node):
+class PoseClient(Node):
 
     def __init__(self):
         DRONE_DEVICE_ID = os.getenv('DRONE_DEVICE_ID')
@@ -58,26 +58,14 @@ class NavigationActionClient(Node):
         self._goal_handle = None
 
         self._action_callback_group = MutuallyExclusiveCallbackGroup()
-        self._action_client = ActionClient(self, NavigationAction, "/" + DRONE_DEVICE_ID + "/navigation", callback_group = self._action_callback_group)
+        self._action_client = ActionClient(self, NavigateToPose, "/" + DRONE_DEVICE_ID + "/navigation", callback_group = self._action_callback_group)
 
-        self._service_callback_group = MutuallyExclusiveCallbackGroup()
-        self._local_waypoint_service = self.create_service(Vec4, '~/local_waypoint', self.local_waypoint_callback, callback_group = self._service_callback_group) 
-        self._gps_waypoint_service = self.create_service(Vec4, '~/gps_waypoint', self.gps_waypoint_callback, callback_group = self._service_callback_group) 
-        self._cancel_goal = self.create_service(Trigger, '~/cancel_goal', self.cancel_goal_callback, callback_group = self._service_callback_group) 
 
     def local_waypoint_callback(self, request, response):
-        self.get_logger().info('Incoming local waypoint request: \t{0}'.format(request.goal))
         self.send_goal(request.goal, True)
         
         # Wait for action to be done
-        self._action_done_event.wait()
-        response.success = self._action_response_result
-        if response.success:
-            response.message = "Goal accepted"
-        else:
-            response.message = "Goal rejected"
-        return response
-
+        
     def gps_waypoint_callback(self, request, response):
         self.get_logger().info('Incoming gps waypoint request: \t{0}'.format(request.goal))
         self.send_goal(request.goal, False)
@@ -111,6 +99,8 @@ class NavigationActionClient(Node):
 
 
     def send_goal(self, goal, is_local):
+        self.get_logger().info('Incoming local waypoint request: \t{0}'.format(request.goal))
+
         self.get_logger().info('Waiting for action server')
         self._action_client.wait_for_server()
 
@@ -180,35 +170,84 @@ class NavigationActionClient(Node):
         feedback = feedback_msg.feedback
         self.get_logger().info('Received feedback: {0}'.format(feedback.mission_progress))
 
-    def cancel_goal(self):
-        self.get_logger().info('Canceling goal')
-        self._action_cancel_event.clear()
-        self._action_cancel_result = False
+def init_arg_parser():
+    parser = argparse.ArgumentParser(
+        prog='mesh_bandwith_test.py',
+        epilog="See '<command> --help' to read about a specific sub-command."
+    )
+
+    subparsers = parser.add_subparsers(dest='command', help='Sub-commands')
+
+    server_parser = subparsers.add_parser('takeoff', help='Run server')
+
+    client_parser = subparsers.add_parser('land', help='Run client')
+
+    plot_parser = subparsers.add_parser('local', help='Plot the results')
+    plot_parser.add_argument('-x', '--file', type=str, help='Path', required=True)
+    plot_parser.add_argument('-y', '--file', type=str, help='Path', required=True)
+    plot_parser.add_argument('-z', '--file', type=str, help='Path', required=True)
+    plot_parser.add_argument('-h', '--file', type=str, help='Path', required=True)
+
+    save_parser = subparsers.add_parser('gps', help='Save results into given path')
+    save_parser.add_argument('-x', '--file', type=str, help='Path', required=True)
+    save_parser.add_argument('-y', '--file', type=str, help='Path', required=True)
+    save_parser.add_argument('-z', '--file', type=str, help='Path', required=True)
+    save_parser.add_argument('-h', '--file', type=str, help='Path', required=True)
+
+    args = parser.parse_args()
+    if args.command is None:
+        parser.print_help()
+
+    return args
+
+def main(args):
+
+    rclpy.init()
+    if args.command == 'land':
+
+        action_client = LandClient()
+        action_client.get_logger().info('********************************')
+
+        action_client.send_goal()
+        rclpy.spin(action_client)
+
+        action_client.get_logger().info('=================================')
+    
+    elif args.command == 'takeoff':
         
-        # Cancel the goal
-        future = self._goal_handle.cancel_goal_async()
-        future.add_done_callback(self.cancel_done)
+        action_client = TakeoffClient()
+        action_client.get_logger().info('********************************')
 
-    def cancel_done(self, future):
-        cancel_response = future.result()
-        if len(cancel_response.goals_canceling) > 0:
-            self.get_logger().info('Goal successfully canceled')
-            self._action_cancel_result = True
-            self._goal_handle = None
-        else:
-            self.get_logger().error('Goal failed to cancel')
+        action_client.send_goal()
+        rclpy.spin(action_client)
 
-        self._action_cancel_event.set()
+        action_client.get_logger().info('=================================')
 
-def main(args=None):
-    rclpy.init(args=args)
-    action_client = NavigationActionClient()
-    action_client.get_logger().info('********************************')
+    elif args.command == 'local':
 
-    executor = MultiThreadedExecutor()
-    rclpy.spin(action_client, executor)
+        action_client = PoseClient()
+        action_client.get_logger().info('********************************')
 
-    action_client.get_logger().info('=================================')
+        action_client.send_goal()
+        rclpy.spin(action_client)
+
+        action_client.get_logger().info('=================================')
+
+    elif args.command == 'gps':
+
+        action_client = PoseClient()
+        action_client.get_logger().info('********************************')
+
+        action_client.send_goal()
+        rclpy.spin(action_client)
+
+        action_client.get_logger().info('=================================')
+
+    
 
 if __name__ == '__main__':
-    main()
+
+    args = init_arg_parser()
+    main(args)
+
+sys.exit()
