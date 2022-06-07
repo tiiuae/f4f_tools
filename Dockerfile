@@ -22,7 +22,7 @@ RUN apt update && apt install -y ros-${ROS_DISTRO}-tf2-ros \
 # pyserial + pymavlink are dependencies of mavlink_shell.
 # unfortunately gcc is required to install pymavlink.
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    python3-pip python3-systemd gcc iperf3\
+    python3-pip python3-systemd gcc iperf3 tmux vim\
     && rm -rf /var/lib/apt/lists/* \
     && pip3 install pyserial pymavlink mavsdk iperf3 matplotlib scipy
 
@@ -39,6 +39,8 @@ ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/f4f-tools
 ENV PYTHONPATH=/opt/ros/galactic/lib/python3.8/site-packages
 ENV LD_LIBRARY_PATH=/opt/ros/galactic/opt/yaml_cpp_vendor/lib:/opt/ros/galactic/lib/x86_64-linux-gnu:/opt/ros/galactic/lib
 
+COPY config/tmux.conf /etc/tmux.conf
 COPY scripts/ /f4f-tools/
 
-ENTRYPOINT ["bash"]
+CMD ["ls","-1","/"]
+
