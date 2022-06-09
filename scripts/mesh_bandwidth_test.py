@@ -72,9 +72,9 @@ class Iperf:
                 self.array[1] = result.received_MB_s
                 self.lock.release()
 
-class PositionSubscriber(Node):
+class GpsPositionSubscriber(Node):
     def __init__(self, args, name, array, lock, index):
-        super().__init__('position_subscriber', namespace=name)
+        super().__init__('gps_position_subscriber', namespace=name)
         self.drone_device_id = name
         self.args = args
         self.lock = lock
@@ -97,7 +97,33 @@ class PositionSubscriber(Node):
         self.lock.acquire()
         self.array[self.index] = msg.lat
         self.array[self.index+1] = msg.lon
-        self.array[self.index+2] = msg.alt
+        self.lock.release()
+
+class LocalPositionSubscriber(Node):
+    def __init__(self, args, name, array, lock, index):
+        super().__init__('local_position_subscriber', namespace=name)
+        self.drone_device_id = name
+        self.args = args
+        self.lock = lock
+        self.array = array
+        self.index = index
+        self.qos_profile = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            durability=QoSDurabilityPolicy.VOLATILE,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+        self.sub = self.create_subscription(
+            VehicleGpsPosition,
+            '/{}/fmu/vehicle_local_position/out'.format(name),
+            self.local_position_listener_cb,
+            self.qos_profile)
+        self.sub
+
+    def local_position_listener_cb(self, msg):
+        self.lock.acquire()
+        self.array[self.index] = -msg.z
+        self.array[self.index+1] = msg.heading
         self.lock.release()
 
         
@@ -110,7 +136,8 @@ class RosClient:
 
     def run(self):
         for i, name in enumerate(self.names):
-            self.nodes.append(PositionSubscriber(args, name, self.array, self.lock, 2+i*3))
+            self.nodes.append(GpsPositionSubscriber(args, name, self.array, self.lock, 2+i*4))
+            self.nodes.append(LocalPositionSubscriber(args, name, self.array, self.lock, 4+i*4))
 
         while True:
             for node in self.nodes:
@@ -128,9 +155,9 @@ class Plot(Node):
         self.data = data
 
     def plot(self):
-        x = self.data[:,2] - self.data[:,5]
-        y = self.data[:,3] - self.data[:,6]
-        i = self.data[:,0]
+        x = self.data['latitude_client'] - self.data['latitude_server']
+        y = self.data['longitude_client'] - self.data['longitude_server']
+        i = self.data['sent_MBs']
         fig = plt.figure()
         ax = fig.add_subplot(111)
         # define grid.
@@ -158,7 +185,7 @@ class Plot(Node):
 
 
 def generate_fake_output(w):
-    array = mp.Array('f', range(8))
+    array = mp.Array('f', range(10))
     x = 5
     y = 15
     r = 10
@@ -168,9 +195,11 @@ def generate_fake_output(w):
         array[2] = x+r*math.cos(i) + random.gauss(0,1.1)
         array[3] = x+r*math.sin(i) + random.gauss(0,1.1)
         array[4] = 3+random.gauss(0,1.1)
-        array[5] = x+random.gauss(0,1.1)
-        array[6] = y+random.gauss(0,1.1)
-        array[7] = 3+random.gauss(0,1.1)
+        array[5] = 0
+        array[6] = x+random.gauss(0,1.1)
+        array[7] = y+random.gauss(0,1.1)
+        array[8] = 3+random.gauss(0,1.1)
+        array[9] = 0
 
         w.writerow(array)
    
@@ -213,11 +242,12 @@ def main(args):
     if args.command == 'client':
         lock = mp.Lock()
         names = [os.getenv('DRONE_DEVICE_ID'), args.server_name]
-        array = mp.Array('f', range(2+3*len(names)))
+        array = mp.Array('f', range(2+4*len(names)))
 
         rclpy.init()
         file = open('/tmp/data.csv', 'w')
         writer = csv.writer(file)
+        writer.writerow(["sent_MBs", "received_MBs", "latitude_client", "longitude_client", "altitude_client", "heading_client", "latitude_server", "longitude_server", "altitude_server", "heading_server"])
 
         iperf = Iperf(args, array, lock, args.test_duration)
         ros = RosClient(args, names, array, lock)
@@ -253,7 +283,7 @@ def main(args):
         status = 0
 
     elif args.command == 'plot':
-        data = np.genfromtxt(args.file, delimiter=',')
+        data = np.genfromtxt(args.file, dtype=float, delimiter=',', names=True)
         sp = Plot(args, data)
         sp.plot()
         status = 0
@@ -265,6 +295,7 @@ def main(args):
     elif args.command == 'fake':
         file = open('/tmp/data.csv', 'w')
         writer = csv.writer(file)
+        writer.writerow(["sent_MBs", "received_MBs", "latitude_client", "longitude_client", "altitude_client", "heading_client", "latitude_server", "longitude_server", "altitude_server", "heading_server"])
         generate_fake_output(writer)
         file.close()
         status = 0
