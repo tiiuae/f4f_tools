@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [[ $# -ne 4 ]]; then
+  echo "Not enough parameters - [x, y, z, heading]"
+  exit
+fi
+
+ros2 service call /"$DRONE_DEVICE_ID"/navigation_action_client/local_waypoint fog_msgs/srv/Vec4 "goal: [$1, $2, $3, $4]"
