@@ -42,5 +42,6 @@ ENV LD_LIBRARY_PATH=/opt/ros/galactic/opt/yaml_cpp_vendor/lib:/opt/ros/galactic/
 COPY config/tmux.conf /etc/tmux.conf
 COPY scripts/ /f4f-tools/
 
-CMD ["ls","-1","/"]
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT /entrypoint.sh
 
