@@ -215,6 +215,7 @@ class NavigationActionClient(Node):
         super().__init__(node_name="navigation_action_client", namespace=DRONE_DEVICE_ID)
         self.get_logger().info('| --------------------- Initialization --------------------- |')
         self.global_service_action = GlobalServiceActionClass(self, DRONE_DEVICE_ID)
+        self.local_service_action = LocalServiceActionClass(self, DRONE_DEVICE_ID)
         self.get_logger().info('| -------------------- Everything ready -------------------- |')
 
 # #{ main 
