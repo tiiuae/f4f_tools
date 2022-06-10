@@ -23,7 +23,7 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy, QoS
 from rcl_interfaces.srv import SetParameters, GetParameters
 from  scipy.interpolate import griddata 
 
-from px4_msgs.msg import VehicleGpsPosition
+from px4_msgs.msg import VehicleGpsPosition, VehicleLocalPosition
 
 class Iperf:
 
@@ -114,7 +114,7 @@ class LocalPositionSubscriber(Node):
             depth=10
         )
         self.sub = self.create_subscription(
-            VehicleGpsPosition,
+            VehicleLocalPosition,
             '/{}/fmu/vehicle_local_position/out'.format(name),
             self.local_position_listener_cb,
             self.qos_profile)
