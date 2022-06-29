@@ -16,6 +16,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import csv
+import utm
 
 import rclpy
 from rclpy.node import Node
@@ -155,24 +156,32 @@ class Plot(Node):
         self.data = data
 
     def plot(self):
-        x = self.data['latitude_client'] - self.data['latitude_server']
-        y = self.data['longitude_client'] - self.data['longitude_server']
+        lat_c = 1e-7*self.data['latitude_client']
+        lon_c = 1e-7*self.data['longitude_client']
+        lat_s = 1e-7*self.data['latitude_server']
+        lon_s = 1e-7*self.data['longitude_server']
+        
+        xc, yc, _, _ = utm.from_latlon(lat_c, lon_c)
+        xs, ys, _, _ = utm.from_latlon(lat_s, lon_s)
+
+        x = xc - xs
+        y = yc - ys
+
         i = self.data['sent_MBs']
+
         fig = plt.figure()
         ax = fig.add_subplot(111)
+
         # define grid.
-        xi = np.linspace(np.min(x),np.max(x),100)
-        yi = np.linspace(np.min(y),np.max(y),100)
-        # yi = np.linspace(0,2*np.pi,100)
+        xi = np.linspace(np.min(x),np.max(x),1000)
+        yi = np.linspace(np.min(y),np.max(y),1000)
         xi, yi = np.meshgrid(xi, yi)
         
         # grid the data.
         zi = griddata((x, y), i, (xi, yi), method='linear')
-        print(zi.shape)
         
         plt.contourf(xi,yi,zi)
         plt.plot(x,y,'k.')
-        # ax.scatter(x, y, c=i, edgecolors='none', norm=matplotlib.colors.LogNorm())
 
         cbar = plt.colorbar()
 
