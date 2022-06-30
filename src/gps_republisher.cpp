@@ -11,11 +11,11 @@ public:
   PoseDataRepublisher()
   : Node("pose_data_republisher")
   {
-    publisher_gps_position_ = this->create_publisher<px4_msgs::msg::VehicleGpsPosition>("gps_topic_out", 10);
-    publisher_local_position_ = this->create_publisher<px4_msgs::msg::VehicleLocalPosition>("local_topic_out", 10);
+    publisher_gps_position_ = this->create_publisher<px4_msgs::msg::VehicleGpsPosition>("gps_topic_out", rclcpp::SystemDefaultsQoS());
+    publisher_local_position_ = this->create_publisher<px4_msgs::msg::VehicleLocalPosition>("local_topic_out", rclcpp::SystemDefaultsQoS());
 
-    subscription_gps_position_ = this->create_subscription<px4_msgs::msg::VehicleGpsPosition>("gps_topic_in", 10, std::bind(&PoseDataRepublisher::gps_position_callback, this, std::placeholders::_1));
-    subscription_local_position_ = this->create_subscription<px4_msgs::msg::VehicleGpsPosition>("local_topic_in", 10, std::bind(&PoseDataRepublisher::local_position_callback, this, std::placeholders::_1));
+    subscription_gps_position_ = this->create_subscription<px4_msgs::msg::VehicleGpsPosition>("gps_topic_in", rclcpp::SystemDefaultsQoS(), std::bind(&PoseDataRepublisher::gps_position_callback, this, std::placeholders::_1));
+    subscription_local_position_ = this->create_subscription<px4_msgs::msg::VehicleGpsPosition>("local_topic_in", rclcpp::SystemDefaultsQoS(), std::bind(&PoseDataRepublisher::local_position_callback, this, std::placeholders::_1));
 
   }
 

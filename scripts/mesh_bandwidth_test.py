@@ -89,7 +89,7 @@ class GpsPositionSubscriber(Node):
         )
         self.sub = self.create_subscription(
             VehicleGpsPosition,
-            '/{}/fmu/vehicle_gps_position/out'.format(name),
+            '/{}/mesh/vehicle_gps_position/out'.format(name),
             self.gps_position_listener_cb,
             self.qos_profile)
         self.sub
@@ -116,7 +116,7 @@ class LocalPositionSubscriber(Node):
         )
         self.sub = self.create_subscription(
             VehicleLocalPosition,
-            '/{}/fmu/vehicle_local_position/out'.format(name),
+            '/{}/mesh/vehicle_local_position/out'.format(name),
             self.local_position_listener_cb,
             self.qos_profile)
         self.sub
