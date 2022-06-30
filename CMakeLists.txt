@@ -14,6 +14,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(px4_msgs REQUIRED)
 
 ## --------------------------------------------------------------
 ## |                            build                           |
@@ -22,12 +23,15 @@ find_package(sensor_msgs REQUIRED)
 add_executable(talker src/fake_lidar_pub.cpp)
 ament_target_dependencies(talker rclcpp sensor_msgs)
 
+add_executable(gps_republisher src/gps_republisher.cpp)
+ament_target_dependencies(gps_republisher rclcpp px4_msgs)
+
 ## --------------------------------------------------------------
 ## |                           install                          |
 ## --------------------------------------------------------------
 
 install(
-  TARGETS talker
+  TARGETS talker gps_republisher
   DESTINATION lib/${PROJECT_NAME}
   )
 
