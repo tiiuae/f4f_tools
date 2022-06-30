@@ -1,2 +1,2 @@
 # f4f_tools
-Fly4future pkg with tools for rel6
+Fly4future pkg with tools
