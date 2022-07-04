@@ -160,6 +160,9 @@ class Plot(Node):
         lon_c = 1e-7*self.data['longitude_client']
         lat_s = 1e-7*self.data['latitude_server']
         lon_s = 1e-7*self.data['longitude_server']
+
+        head_s = self.data['heading_server']
+        head_c = self.data['heading_client']
         
         xc, yc, _, _ = utm.from_latlon(lat_c, lon_c)
         xs, ys, _, _ = utm.from_latlon(lat_s, lon_s)
@@ -181,9 +184,20 @@ class Plot(Node):
         zi = griddata((x, y), i, (xi, yi), method='linear')
         
         plt.contourf(xi,yi,zi)
-        plt.plot(x,y,'k.')
+
+        # plot client positions with orientation
+        # plt.plot(x,y,'k.')
+        ax = plt.axes()
+        for i in range(len(x)):
+            ax.arrow(x[i], y[i], math.sin(head_c[i]), math.cos(head_c[i]), head_width=0.5, head_length=0.5, fc='k', ec='k')
+
+        # plot server drone position
+        ax.arrow(0, 0, math.sin(head_s[0]), math.cos(head_s[0]), head_width=0.5, head_length=0.5, fc='r', ec='r')
+        plt.xlabel('x [m]')
+        plt.ylabel('y [m]')
 
         cbar = plt.colorbar()
+        cbar.set_label('MB/s', rotation=270)
 
         # bx = fig.add_subplot(122)
         # bx.pcolormesh(zi, norm=matplotlib.colors.LogNorm())
