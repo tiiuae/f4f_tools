@@ -22,7 +22,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy, QoSHistoryPolicy
 from rcl_interfaces.srv import SetParameters, GetParameters
-from  scipy.interpolate import griddata 
+from scipy import interpolate
 
 from px4_msgs.msg import VehicleGpsPosition, VehicleLocalPosition
 
@@ -100,6 +100,7 @@ class GpsPositionSubscriber(Node):
         self.array[self.index+1] = msg.lon
         self.lock.release()
 
+
 class LocalPositionSubscriber(Node):
     def __init__(self, args, name, array, lock, index):
         super().__init__('local_position_subscriber', namespace=name)
@@ -143,11 +144,12 @@ class RosClient:
         while True:
             for node in self.nodes:
                 rclpy.spin_once(node, timeout_sec=1) 
-                time.sleep(0.8)
+                time.sleep(0.1)
 
     def destroy(self):
         for node in self.nodes:
             node.destroy()
+
 
 class Plot(Node):
     def __init__(self, args, data):
@@ -163,6 +165,7 @@ class Plot(Node):
 
         head_s = self.data['heading_server']
         head_c = self.data['heading_client']
+        head = head_s + (head_s - head_c)
         
         xc, yc, _, _ = utm.from_latlon(lat_c, lon_c)
         xs, ys, _, _ = utm.from_latlon(lat_s, lon_s)
@@ -170,41 +173,43 @@ class Plot(Node):
         x = xc - xs
         y = yc - ys
 
-        i = self.data['sent_MBs']
-
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
+        d = np.round(self.data['sent_MBs'], 1)
 
         # define grid.
-        xi = np.linspace(np.min(x),np.max(x),1000)
-        yi = np.linspace(np.min(y),np.max(y),1000)
+        margin = 3
+        resolution = 100 
+
+        xi = np.linspace(np.min(x)-margin,np.max(x)+margin, resolution)
+        yi = np.linspace(np.min(y)-margin,np.max(y)+margin, resolution)
         xi, yi = np.meshgrid(xi, yi)
         
         # grid the data.
-        zi = griddata((x, y), i, (xi, yi), method='linear')
-        
-        plt.contourf(xi,yi,zi)
+        zi = interpolate.griddata((x, y), d, (xi, yi), method='linear')
 
-        # plot client positions with orientation
-        # plt.plot(x,y,'k.')
-        ax = plt.axes()
+        zi[(pow(xi,2) + pow(yi,2) <= 16)] = np.nan
+        
+        fig = plt.figure()
+        fig.tight_layout()
+
+        ax = fig.add_subplot(111)
+        ax.set(xlabel='x [m]', ylabel='y [m]')
+
+        cont = ax.contourf(xi,yi,zi)
+
+        # plot client drone positions
         for i in range(len(x)):
-            ax.arrow(x[i], y[i], math.sin(head_c[i]), math.cos(head_c[i]), head_width=0.5, head_length=0.5, fc='k', ec='k')
+            ax.arrow(x[i], y[i], math.sin(head[i]), math.cos(head[i]), head_width=0.4, head_length=0.5, fc='k', ec='k')
+            ax.plot(x[i], y[i], marker="o", markersize=2, markerfacecolor="black", markeredgecolor="black")
+            # ax.annotate(d[i], xy=(x[i], y[i]))
 
         # plot server drone position
-        ax.arrow(0, 0, math.sin(head_s[0]), math.cos(head_s[0]), head_width=0.5, head_length=0.5, fc='r', ec='r')
-        plt.xlabel('x [m]')
-        plt.ylabel('y [m]')
+        ax.plot(0, 0, marker="o", markersize=2, markerfacecolor="black", markeredgecolor="black")
+        ax.arrow(0, 0, math.sin(head_s[0]), math.cos(head_s[0]), head_width=0.3, head_length=0.5, fc='k', ec='k')
 
-        cbar = plt.colorbar()
-        cbar.set_label('MB/s', rotation=270)
-
-        # bx = fig.add_subplot(122)
-        # bx.pcolormesh(zi, norm=matplotlib.colors.LogNorm())
-        # bx.pcolormesh(zi)
+        cbar = plt.colorbar(cont)
+        cbar.set_label('MB/s', rotation=270, labelpad=12)
 
         plt.show()
-
 
 
 def generate_fake_output(w):
@@ -226,6 +231,7 @@ def generate_fake_output(w):
 
         w.writerow(array)
    
+
 def init_arg_parser():
     parser = argparse.ArgumentParser(
         prog='mesh_bandwith_test.py',
@@ -257,6 +263,7 @@ def init_arg_parser():
         parser.print_help()
 
     return args
+
 
 def main(args):
 
@@ -324,6 +331,7 @@ def main(args):
         status = 0
 
     return status
+
 
 if __name__ == '__main__':
 
