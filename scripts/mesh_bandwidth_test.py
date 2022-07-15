@@ -214,18 +214,20 @@ class Plot(Node):
 
 def generate_fake_output(w):
     array = mp.Array('f', range(10))
-    x = 5
-    y = 15
+    x = 0
+    y = 0 
     r = 10
     for i in range(500):
-        array[0] = 50*random.gauss(1, 0.1)
-        array[1] = 50*random.gauss(1, 0.1)
-        array[2] = x+r*math.cos(i) + random.gauss(0,1.1)
-        array[3] = x+r*math.sin(i) + random.gauss(0,1.1)
+        array[0] = 20*random.gauss(1, 0.1)
+        array[1] = 20*random.gauss(1, 0.1)
+        array[2], array[3] = utm.to_latlon(150000 + x+r*math.cos(i) + random.gauss(0,1.1), 150000 + x+r*math.sin(i) + random.gauss(0,1.1), 33, "U")
+        array[2] = array[2]/1e-7
+        array[3] = array[3]/1e-7
         array[4] = 3+random.gauss(0,1.1)
         array[5] = 0
-        array[6] = x+random.gauss(0,1.1)
-        array[7] = y+random.gauss(0,1.1)
+        array[6], array[7] = utm.to_latlon(150000 + random.gauss(0,1.1), 150000 + random.gauss(0,1.1), 33, "U")
+        array[6] = array[6]/1e-7
+        array[7] = array[7]/1e-7
         array[8] = 3+random.gauss(0,1.1)
         array[9] = 0
 
