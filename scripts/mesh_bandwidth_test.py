@@ -22,9 +22,9 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy, QoSHistoryPolicy
 from rcl_interfaces.srv import SetParameters, GetParameters
-from scipy import interpolate
-
 from px4_msgs.msg import VehicleGpsPosition, VehicleLocalPosition
+
+from scipy import interpolate
 
 class Iperf:
 
@@ -186,7 +186,7 @@ class Plot(Node):
         # grid the data.
         zi = interpolate.griddata((x, y), d, (xi, yi), method='linear')
 
-        zi[(pow(xi,2) + pow(yi,2) <= 16)] = np.nan
+        zi[(pow(xi,2) + pow(yi,2) <= 4)] = np.nan
         
         fig = plt.figure()
         fig.tight_layout()
@@ -194,17 +194,17 @@ class Plot(Node):
         ax = fig.add_subplot(111)
         ax.set(xlabel='x [m]', ylabel='y [m]')
 
-        cont = ax.contourf(xi,yi,zi)
+        cont = ax.contourf(xi,yi,zi, np.arange(10,40,2), cmap=plt.cm.get_cmap('YlGnBu'))
 
         # plot client drone positions
         for i in range(len(x)):
             ax.arrow(x[i], y[i], math.sin(head[i]), math.cos(head[i]), head_width=0.4, head_length=0.5, fc='k', ec='k')
-            ax.plot(x[i], y[i], marker="o", markersize=2, markerfacecolor="black", markeredgecolor="black")
+            ax.plot(x[i], y[i], marker="o", markersize=1, markerfacecolor="black", markeredgecolor="black")
             # ax.annotate(d[i], xy=(x[i], y[i]))
 
         # plot server drone position
-        ax.plot(0, 0, marker="o", markersize=2, markerfacecolor="black", markeredgecolor="black")
-        ax.arrow(0, 0, math.sin(head_s[0]), math.cos(head_s[0]), head_width=0.3, head_length=0.5, fc='k', ec='k')
+        ax.plot(0, 0, marker="o", markersize=2, markerfacecolor="red", markeredgecolor="black")
+        ax.arrow(0, 0, math.sin(head_s[0]), math.cos(head_s[0]), head_width=0.3, head_length=0.5, fc='r', ec='r')
 
         cbar = plt.colorbar(cont)
         cbar.set_label('MB/s', rotation=270, labelpad=12)
