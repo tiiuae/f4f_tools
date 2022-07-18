@@ -192,9 +192,12 @@ class Plot(Node):
         fig.tight_layout()
 
         ax = fig.add_subplot(111)
-        ax.set(xlabel='x [m]', ylabel='y [m]')
+        ax.set(title=self.args.title, xlabel='x [m]', ylabel='y [m]')
 
-        cont = ax.contourf(xi,yi,zi, np.arange(10,40,2), cmap=plt.cm.get_cmap('YlGnBu'))
+        cbar_low = 5
+        cbar_high = 40
+
+        cont = ax.contourf(xi,yi,zi, np.arange(cbar_low, cbar_high, 2), cmap=plt.cm.get_cmap('YlGnBu'))
 
         # plot client drone positions
         for i in range(len(x)):
@@ -254,6 +257,7 @@ def init_arg_parser():
 
     plot_parser = subparsers.add_parser('plot', help='Plot the results')
     plot_parser.add_argument('-f', '--file', type=str, help='Path to a data file, default=[/tmp/data.csv]', default='/tmp/data.csv')
+    plot_parser.add_argument('-t', '--title', type=str, help='Title to the figure, default is nothing', default='Mesh test')
 
     save_parser = subparsers.add_parser('save', help='Save results into given path')
     save_parser.add_argument('-p', '--path', type=str, help='Path to copy the data file', required=True)
