@@ -1,2 +1,0 @@
-#!/bin/bash
-ros2 service call /"$DRONE_DEVICE_ID"/control_interface/takeoff std_srvs/srv/Trigger
