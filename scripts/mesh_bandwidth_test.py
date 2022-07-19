@@ -73,85 +73,72 @@ class Iperf:
                 self.array[1] = result.received_MB_s
                 self.lock.release()
 
-class GpsPositionSubscriber(Node):
-    def __init__(self, args, name, array, lock, index):
-        super().__init__('gps_position_subscriber', namespace=name)
-        self.drone_device_id = name
-        self.args = args
+class Uav(Node):
+    def __init__(self, name, array, lock, index):
+        super().__init__('ros_node', namespace=name)
+        self.name = name
         self.lock = lock
         self.array = array
         self.index = index
+
         self.qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             durability=QoSDurabilityPolicy.VOLATILE,
             history=QoSHistoryPolicy.KEEP_LAST,
             depth=10
         )
-        self.sub = self.create_subscription(
+
+        gps_name = '/{}/mesh/vehicle_gps_position/out'.format(self.name)
+        local_name = '/{}/mesh/vehicle_local_position/out'.format(self.name)
+
+        self.get_logger().info('Subscribing to %s' % local_name)
+        self.local = self.create_subscription(
+            VehicleLocalPosition,
+            local_name,
+            self.local_position_listener_cb,
+            self.qos_profile)
+        self.local
+
+        self.get_logger().info('Subscribing to %s' % gps_name)
+        self.gps = self.create_subscription(
             VehicleGpsPosition,
-            '/{}/mesh/vehicle_gps_position/out'.format(name),
+            gps_name,
             self.gps_position_listener_cb,
             self.qos_profile)
-        self.sub
+        self.gps
 
     def gps_position_listener_cb(self, msg):
+        self.get_logger().info('I heard GPS from %s' % self.name)
         self.lock.acquire()
         self.array[self.index] = msg.lat
         self.array[self.index+1] = msg.lon
         self.lock.release()
 
-
-class LocalPositionSubscriber(Node):
-    def __init__(self, args, name, array, lock, index):
-        super().__init__('local_position_subscriber', namespace=name)
-        self.drone_device_id = name
-        self.args = args
-        self.lock = lock
-        self.array = array
-        self.index = index
-        self.qos_profile = QoSProfile(
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,
-            durability=QoSDurabilityPolicy.VOLATILE,
-            history=QoSHistoryPolicy.KEEP_LAST,
-            depth=10
-        )
-        self.sub = self.create_subscription(
-            VehicleLocalPosition,
-            '/{}/mesh/vehicle_local_position/out'.format(name),
-            self.local_position_listener_cb,
-            self.qos_profile)
-        self.sub
-
     def local_position_listener_cb(self, msg):
+        self.get_logger().info('I heard local from %s' % self.name)
         self.lock.acquire()
-        self.array[self.index] = -msg.z
-        self.array[self.index+1] = msg.heading
+        self.array[self.index+2] = -msg.z
+        self.array[self.index+3] = msg.heading
         self.lock.release()
-
         
-class RosClient:
+
+class RosClient():
     def __init__(self, args, names, array, lock):
-        self.nodes = []
         self.lock = lock
         self.names = names
         self.array = array
+        self.nodes = []
 
     def run(self):
         for i, name in enumerate(self.names):
-            self.nodes.append(GpsPositionSubscriber(args, name, self.array, self.lock, 2+i*4))
-            self.nodes.append(LocalPositionSubscriber(args, name, self.array, self.lock, 4+i*4))
+            self.nodes.append(Uav(name, self.array, self.lock, 2+4*i))
 
         while True:
             for node in self.nodes:
-                rclpy.spin_once(node, timeout_sec=1) 
-                time.sleep(0.1)
-
-    def destroy(self):
-        for node in self.nodes:
-            node.destroy()
+                rclpy.spin_once(node)
 
 
-class Plot(Node):
+class Plot:
     def __init__(self, args, data):
         self.drone_device_id = os.getenv('DRONE_DEVICE_ID')
         self.args = args
@@ -303,7 +290,7 @@ def main(args):
                 time.sleep(1)
    
         except KeyboardInterrupt:
-            ros.destroy()
+            ros.destroy_node()
             ipp.terminate()
             rosp.terminate()
             ipp.join()
