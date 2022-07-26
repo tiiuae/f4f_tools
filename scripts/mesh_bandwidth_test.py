@@ -11,6 +11,7 @@ import threading
 import multiprocessing as mp
 import shutil
 import random
+import re
 import math
 import matplotlib
 import matplotlib.pyplot as plt
@@ -214,6 +215,61 @@ class Plot(Node):
 
         plt.show()
 
+class Compare():
+    def __init__(self, args, data1, data2):
+        self.args = args
+        self.data1 = data1
+        self.data2 = data2
+
+    def distance(self):
+        lat_c1 = 1e-7*self.data1['latitude_client']
+        lon_c1 = 1e-7*self.data1['longitude_client']
+        lat_s1 = 1e-7*self.data1['latitude_server']
+        lon_s1 = 1e-7*self.data1['longitude_server']
+
+        lat_c2 = 1e-7*self.data2['latitude_client']
+        lon_c2 = 1e-7*self.data2['longitude_client']
+        lat_s2 = 1e-7*self.data2['latitude_server']
+        lon_s2 = 1e-7*self.data2['longitude_server']
+
+        xc1, yc1, _, _ = utm.from_latlon(lat_c1, lon_c1)
+        xs1, ys1, _, _ = utm.from_latlon(lat_s1, lon_s1)
+
+        xc2, yc2, _, _ = utm.from_latlon(lat_c2, lon_c2)
+        xs2, ys2, _, _ = utm.from_latlon(lat_s2, lon_s2)
+
+        x1 = xc1 - xs1
+        y1 = yc1 - ys1
+
+        x2 = xc2 - xs2
+        y2 = yc2 - ys2
+
+        s1 = np.round(self.data1['sent_MBs'], 1)
+        s2 = np.round(self.data2['sent_MBs'], 1)
+
+        name1 = re.search(r'(\w+)\.', args.file1).group(1)
+        name2 = re.search(r'(\w+)\.', args.file2).group(1)
+        print('\t Distances  \t Avg {} \t Avg {} \t Loss'.format(name1.upper(), name2.upper()))
+        print('\t    [m]  \t   [Mb/s]  \t   [Mb/s]  \t [%] \n')
+        avgs = []
+        for i in range(3,35):
+            distances1 = (abs(x1**2 - y1**2))**(0.5)
+            mask = ((distances1 >= i) & (distances1 < i+1))
+            filtered_data1 = s1[mask] 
+
+            distances2 = (abs(x2**2 - y2**2))**(0.5)
+            mask = ((distances2 >= i) & (distances2 < i+1))
+            filtered_data2 = s2[mask] 
+
+            if (len(filtered_data1) != 0 and len(filtered_data2) != 0):
+                avg1 = sum(filtered_data1)/len(filtered_data1)
+                avg2 = sum(filtered_data2)/len(filtered_data2)
+                loss = 100*(avg1-avg2)/avg1
+
+                print('\t {} to {} \t {:.2f}  \t {:.2f}  \t {:.2f} '.format(i, i+1, avg1, avg2, loss))
+                avgs.append(loss)
+        print('\n \t Average loss: \t {:.2f} [%]'.format(sum(avgs)/len(avgs)))
+
 
 def generate_fake_output(w):
     array = mp.Array('f', range(10))
@@ -261,6 +317,10 @@ def init_arg_parser():
 
     save_parser = subparsers.add_parser('save', help='Save results into given path')
     save_parser.add_argument('-p', '--path', type=str, help='Path to copy the data file', required=True)
+
+    compare_parser = subparsers.add_parser('compare', help='Compare data from 2 different experiments')
+    compare_parser.add_argument('-f1', '--file1', type=str, help='Path to data from experiment 1', required=True)
+    compare_parser.add_argument('-f2', '--file2', type=str, help='Path to data from experiment 2', required=True)
 
     fake_parser = subparsers.add_parser('fake', help='Generate fake data for the plot testing')
 
@@ -322,6 +382,13 @@ def main(args):
         data = np.genfromtxt(args.file, dtype=float, delimiter=',', names=True)
         sp = Plot(args, data)
         sp.plot()
+        status = 0
+
+    elif args.command == 'compare':
+        data1 = np.genfromtxt(args.file1, dtype=float, delimiter=',', names=True)
+        data2 = np.genfromtxt(args.file2, dtype=float, delimiter=',', names=True)
+        sp = Compare(args, data1, data2)
+        sp.distance()
         status = 0
 
     elif args.command == 'save':
