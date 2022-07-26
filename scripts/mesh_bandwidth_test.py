@@ -42,7 +42,7 @@ class Iperf:
         print("Starting server, listening on %s:%d" % (self.args.ip, self.args.port))
         while True:
             result = server.run()
-            print("\r\tTest number %d done" % self.test_num, end=" ")
+            print("\r\tTest number {} done\n".format(self.test_num), end=" ")
             sys.stdout.flush()
             self.test_num += 1
 
@@ -64,7 +64,7 @@ class Iperf:
                 print(result.error)
                 time.sleep(1)
             else:
-                print('\r\tTest number {} done'.format(self.test_num), end=" ")
+                print('\r\tTest number {} done\n'.format(self.test_num), end=" ")
                 sys.stdout.flush()
                 self.test_num += 1
 
@@ -136,6 +136,11 @@ class RosClient():
         while True:
             for node in self.nodes:
                 rclpy.spin_once(node)
+
+    def destroy_node():
+        for node in self.nodes:
+            node.destroy()
+
 
 
 class Plot:
