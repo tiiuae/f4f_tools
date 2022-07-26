@@ -28,8 +28,8 @@ input=(
   'client' 'cd ~/git/f4f_tools/scripts; ./mesh_bandwidth_test.py client -sn cze02'
   'gps cze02' 'ros2 topic pub /cze02/mesh/vehicle_gps_position/out px4_msgs/VehicleGpsPosition "{lat: 501117442.0, lon: 144173026.0}"'
   'gps cze05' 'ros2 topic pub /cze05/mesh/vehicle_gps_position/out px4_msgs/VehicleGpsPosition "{lat: 501117440.0, lon: 144173024.0}"'
-  'local cze02' 'ros2 topic pub /cze02/mesh/vehicle_gps_position/out px4_msgs/VehicleLocalPosition "{z: 2.0, heading: 0.0}"'
-  'local cze05' 'ros2 topic pub /cze05/mesh/vehicle_gps_position/out px4_msgs/VehicleLocalPosition "{z: 3.0, heading: 1.67}"'
+  'local cze02' 'ros2 topic pub /cze02/mesh/vehicle_local_position/out px4_msgs/VehicleLocalPosition "{z: 2.0, heading: 0.0}"'
+  'local cze05' 'ros2 topic pub /cze05/mesh/vehicle_local_position/out px4_msgs/VehicleLocalPosition "{z: 3.0, heading: 1.67}"'
 
 )
 
