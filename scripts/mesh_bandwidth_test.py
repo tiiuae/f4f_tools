@@ -26,26 +26,42 @@ from px4_msgs.msg import VehicleGpsPosition, VehicleLocalPosition
 
 from scipy import interpolate
 
+class Status:
+    def __init__(self, args, data, lock):
+        self.args = args
+        self.lock = lock
+        self.data = data
+
+    def client(self):
+        while True:
+            self.lock.acquire()
+            print("\r Written: {:.0f}, tests done: {:.0f}, CLIENT times - local: {}, gps: {}, SERVER times - local: {}, gps: {}".format(self.data[0], self.data[1], self.data[2], self.data[3], self.data[4], self.data[5]), end=" ")
+            self.lock.release()
+            sys.stdout.flush()
+
+            time.sleep(1)
+
 class Iperf:
 
-    def __init__(self, args, array=None, lock=None, duration=1):
+    def __init__(self, args, status=None, status_lock=None, array=None, lock=None, duration=1):
         self.args = args
         self.lock = lock
         self.array = array
-        self.test_num = 1
         self.duration = duration
+        self.status = status
+        self.lock_status = status_lock
 
     def run_server(self):
         server = iperf3.Server()
         server.bind_address = self.args.ip
         server.port = self.args.port
         print("Starting server, listening on %s:%d" % (self.args.ip, self.args.port))
+        num_of_tests=0
         while True:
             result = server.run()
-            print("\r\tTest number {} done\n".format(self.test_num), end=" ")
+            print("\r\tTests done: {}".format(num_of_tests), end=" ")
             sys.stdout.flush()
-            self.test_num += 1
-
+            num_of_tests+=1
 
     def run_client(self):
         client = iperf3.Client()
@@ -64,9 +80,9 @@ class Iperf:
                 print(result.error)
                 time.sleep(1)
             else:
-                print('\r\tTest number {} done\n'.format(self.test_num), end=" ")
-                sys.stdout.flush()
-                self.test_num += 1
+                self.lock_status.acquire()
+                self.status[1] += 1
+                self.lock_status.release()
 
                 self.lock.acquire()
                 self.array[0] = result.sent_MB_s
@@ -74,12 +90,19 @@ class Iperf:
                 self.lock.release()
 
 class Uav(Node):
-    def __init__(self, name, array, lock, index):
+    def __init__(self, name, array, lock, status, lock_status, index):
         super().__init__('ros_node', namespace=name)
         self.name = name
         self.lock = lock
         self.array = array
-        self.index = index
+        self.index = 2+4*index
+        self.status = status
+        self.lock_status = lock_status
+        self.last_gps_stamp = 0
+        self.last_local_stamp = 0
+        self.gps_initialized = False
+        self.local_initialized = False
+        self.status_index = index
 
         self.qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -91,7 +114,6 @@ class Uav(Node):
         gps_name = '/{}/mesh/vehicle_gps_position/out'.format(self.name)
         local_name = '/{}/mesh/vehicle_local_position/out'.format(self.name)
 
-        self.get_logger().info('Subscribing to %s' % local_name)
         self.local = self.create_subscription(
             VehicleLocalPosition,
             local_name,
@@ -99,7 +121,6 @@ class Uav(Node):
             self.qos_profile)
         self.local
 
-        self.get_logger().info('Subscribing to %s' % gps_name)
         self.gps = self.create_subscription(
             VehicleGpsPosition,
             gps_name,
@@ -108,30 +129,51 @@ class Uav(Node):
         self.gps
 
     def gps_position_listener_cb(self, msg):
-        self.get_logger().info('I heard GPS from %s' % self.name)
+
+        if not self.gps_initialized:
+            self.last_gps_stamp = msg.timestamp
+            self.gps_initialized = True
+            return
+            
         self.lock.acquire()
         self.array[self.index] = msg.lat
         self.array[self.index+1] = msg.lon
         self.lock.release()
 
+        self.lock_status.acquire()
+        self.status[2+2*self.status_index] = self.last_gps_stamp - msg.timestamp
+        self.lock_status.release()
+        self.last_gps_stamp = msg.timestamp
+
     def local_position_listener_cb(self, msg):
-        self.get_logger().info('I heard local from %s' % self.name)
+        if not self.local_initialized:
+            self.last_local_stamp = msg.timestamp
+            self.local_initialized = True
+            return
+
         self.lock.acquire()
         self.array[self.index+2] = -msg.z
         self.array[self.index+3] = msg.heading
         self.lock.release()
         
+        self.lock_status.acquire()
+        self.status[2+2*self.status_index+1] = self.last_local_stamp - msg.timestamp
+        self.lock_status.release()
+        self.last_local_stamp = msg.timestamp
 
 class RosClient():
-    def __init__(self, args, names, array, lock):
+    def __init__(self, args, names, array, lock, status, lock_status):
         self.lock = lock
         self.names = names
         self.array = array
         self.nodes = []
+        self.status = status
+        self.lock_status = lock_status
 
     def run(self):
+        status_index = 0
         for i, name in enumerate(self.names):
-            self.nodes.append(Uav(name, self.array, self.lock, 2+4*i))
+            self.nodes.append(Uav(name, self.array, self.lock, self.status, self.lock_status, i))
 
         while True:
             for node in self.nodes:
@@ -140,7 +182,6 @@ class RosClient():
     def destroy_node():
         for node in self.nodes:
             node.destroy()
-
 
 
 class Plot:
@@ -208,7 +249,7 @@ class Plot:
 
 
 def generate_fake_output(w):
-    array = mp.Array('f', range(10))
+    array = mp.Array('f', np.zeros(10))
     x = 0
     y = 0 
     r = 10
@@ -270,39 +311,53 @@ def main(args):
     if args.command == 'client':
         lock = mp.Lock()
         names = [os.getenv('DRONE_DEVICE_ID'), args.server_name]
-        array = mp.Array('f', range(2+4*len(names)))
+        array = mp.Array('f', np.zeros(2+4*len(names)))
+        status_data = mp.Array('f', np.zeros(2+2*len(names)))
+        lock_status = mp.Lock()
 
         rclpy.init()
         file = open('/tmp/data.csv', 'w')
         writer = csv.writer(file)
         writer.writerow(["sent_MBs", "received_MBs", "latitude_client", "longitude_client", "altitude_client", "heading_client", "latitude_server", "longitude_server", "altitude_server", "heading_server"])
 
-        iperf = Iperf(args, array, lock, args.test_duration)
-        ros = RosClient(args, names, array, lock)
+        iperf = Iperf(args, status_data, lock_status, array, lock, args.test_duration)
+        ros = RosClient(args, names, array, lock, status_data, lock_status)
+        st = Status(args, status_data, lock_status)
 
         ipp = mp.Process(target=iperf.test)
         rosp = mp.Process(target=ros.run)
+        stp = mp.Process(target=st.client)
 
         ipp.start()
         rosp.start()
+        stp.start()
 
         try: 
             while True:
-                lock.acquire()
-                # print("writing")
-                writer.writerow(array)
-                lock.release()
-                time.sleep(1)
+                if 0.0 not in array:
+                    lock.acquire()
+                    writer.writerow(array)
+                    lock.release()
+
+                    lock_status.acquire()
+                    status_data[0] += 1
+                    lock_status.release()
+
+                    time.sleep(1)
    
         except KeyboardInterrupt:
             ros.destroy_node()
             ipp.terminate()
             rosp.terminate()
+            stp.terminate()
             ipp.join()
             rosp.join()
+            stp.join()
+
             file.close()
             print('I am out')
             rclpy.shutdown()
+
             status = 0
 
     elif args.command == 'server':
