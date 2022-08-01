@@ -24,7 +24,7 @@ RUN apt update && apt install -y ros-${ROS_DISTRO}-tf2-ros \
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     python3-pip python3-systemd gcc iperf3 tmux vim ros-galactic-fognav-msgs\
     && rm -rf /var/lib/apt/lists/* \
-    && pip3 install pyserial pymavlink mavsdk iperf3 matplotlib scipy utm
+    && pip3 install pyserial pymavlink mavsdk iperf3 matplotlib scipy utm numpy==1.23.0
 
 WORKDIR /f4f-tools
 
