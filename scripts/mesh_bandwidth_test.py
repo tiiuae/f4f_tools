@@ -141,7 +141,7 @@ class Uav(Node):
         self.lock.release()
 
         self.lock_status.acquire()
-        self.status[2+2*self.status_index] = self.last_gps_stamp - msg.timestamp
+        self.status[2+2*self.status_index] = (msg.timestamp - self.last_gps_stamp)/1000
         self.lock_status.release()
         self.last_gps_stamp = msg.timestamp
 
@@ -157,7 +157,7 @@ class Uav(Node):
         self.lock.release()
         
         self.lock_status.acquire()
-        self.status[2+2*self.status_index+1] = self.last_local_stamp - msg.timestamp
+        self.status[2+2*self.status_index+1] = (msg.timestamp - self.last_local_stamp)/1000
         self.lock_status.release()
         self.last_local_stamp = msg.timestamp
 
