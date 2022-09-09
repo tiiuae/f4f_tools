@@ -35,7 +35,7 @@ class Status:
     def client(self):
         while True:
             self.lock.acquire()
-            print("\r Written: {:.0f}, tests done: {:.0f}, CLIENT times - local: {}, gps: {}, SERVER times - local: {}, gps: {}".format(self.data[0], self.data[1], self.data[2], self.data[3], self.data[4], self.data[5]), end=" ")
+            print("\r Written: {:.0f}, tests done: {:.0f}, CLIENT times - local: {:.2f}, gps: {:.2f}, SERVER times - local: {:.2f}, gps: {:.2f}".format(self.data[0], self.data[1], self.data[2], self.data[3], self.data[4], self.data[5]), end=" ")
             self.lock.release()
             sys.stdout.flush()
 
@@ -141,7 +141,7 @@ class Uav(Node):
         self.lock.release()
 
         self.lock_status.acquire()
-        self.status[2+2*self.status_index] = (msg.timestamp - self.last_gps_stamp)/1000
+        self.status[2+2*self.status_index] = (msg.timestamp - self.last_gps_stamp)/1000000
         self.lock_status.release()
         self.last_gps_stamp = msg.timestamp
 
@@ -157,7 +157,7 @@ class Uav(Node):
         self.lock.release()
         
         self.lock_status.acquire()
-        self.status[2+2*self.status_index+1] = (msg.timestamp - self.last_local_stamp)/1000
+        self.status[2+2*self.status_index+1] = (msg.timestamp - self.last_local_stamp)/1000000
         self.lock_status.release()
         self.last_local_stamp = msg.timestamp
 
@@ -177,7 +177,7 @@ class RosClient():
 
         while True:
             for node in self.nodes:
-                rclpy.spin_once(node)
+                rclpy.spin_once(node, 0)
 
     def destroy_node():
         for node in self.nodes:
