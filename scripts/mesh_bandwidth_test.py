@@ -177,7 +177,7 @@ class RosClient():
 
         while True:
             for node in self.nodes:
-                rclpy.spin_once(node, 0)
+                rclpy.spin_once(node)
 
     def destroy_node():
         for node in self.nodes:
