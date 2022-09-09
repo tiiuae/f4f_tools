@@ -1,4 +1,4 @@
-FROM ghcr.io/tiiuae/fog-ros-baseimage:builder-latest AS builder
+FROM ghcr.io/tiiuae/fog-ros-baseimage:builder-2f516bb AS builder
 
 COPY . /main_ws/src/
 
@@ -10,8 +10,7 @@ RUN /packaging/build.sh
 #  ▲               runtime ──┐
 #  └── build                 ▼
 
-FROM ghcr.io/tiiuae/fog-ros-baseimage:stable
-# FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-1cabd43
+FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-2f516bb
 
 COPY --from=builder /main_ws/src/build_output/ros-*-f4f-tools_*_amd64.deb /f4f-tools.deb
 
