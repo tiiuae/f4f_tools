@@ -1,4 +1,4 @@
-FROM ghcr.io/tiiuae/fog-ros-baseimage:builder-2f516bb AS builder
+FROM ghcr.io/tiiuae/fog-ros-baseimage:builder-c51e8f8 AS builder
 
 COPY . /main_ws/src/
 
@@ -10,20 +10,12 @@ RUN /packaging/build.sh
 #  ▲               runtime ──┐
 #  └── build                 ▼
 
-FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-2f516bb
+FROM ghcr.io/tiiuae/fog-ros-baseimage:sha-c51e8f8
 
 COPY --from=builder /main_ws/src/build_output/ros-*-f4f-tools_*_amd64.deb /f4f-tools.deb
 
 # need update because ROS people have a habit of removing old packages pretty fast
-RUN apt update && apt install -y ros-${ROS_DISTRO}-tf2-ros \
-	&& dpkg -i /f4f-tools.deb && rm /f4f-tools.deb
-
-# pyserial + pymavlink are dependencies of mavlink_shell.
-# unfortunately gcc is required to install pymavlink.
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
-    python3-pip python3-systemd gcc iperf3 tmux vim ros-galactic-fognav-msgs\
-    && rm -rf /var/lib/apt/lists/* \
-    && pip3 install pyserial pymavlink mavsdk iperf3 matplotlib scipy utm numpy==1.23.0
+RUN dpkg -i /f4f-tools.deb && rm /f4f-tools.deb
 
 WORKDIR /f4f-tools
 
