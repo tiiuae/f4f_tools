@@ -19,9 +19,6 @@ RUN dpkg -i /f4f-tools.deb && rm /f4f-tools.deb
 
 WORKDIR /f4f-tools
 
-# Install pip and python dependencies
-# RUN python3 -m pip install systemd
-
 # make all commands in /f4f-tools/* invocable without full path
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/f4f-tools
 
