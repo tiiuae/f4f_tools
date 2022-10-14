@@ -1,0 +1,6 @@
+/cze03/global_costmap/costmap_updates:
+  reliability: best_effort
+  history: keep_all
+/cze03/rplidar/scan:
+  reliability: best_effort
+  history: keep_all
